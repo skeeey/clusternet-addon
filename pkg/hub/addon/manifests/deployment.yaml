@@ -1,0 +1,33 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: clusternet-addon
+  namespace: {{ .AddonInstallNamespace }}
+  labels:
+    app: clusternet-addon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clusternet-addon
+  template:
+    metadata:
+      labels:
+        app: clusternet-addon
+    spec:
+      serviceAccountName: clusternet-addon-sa
+      containers:
+      - name: clusternet-addon
+        image: quay.io/skeeey/clusternet-addon:latest
+        args:
+          - "/clusternet"
+          - "agent"
+          - "--hub-kubeconfig=/var/run/hub/kubeconfig"
+          - "--cluster-name={{ .ClusterName }}"
+        volumeMounts:
+          - name: hub-config
+            mountPath: /var/run/hub
+      volumes:
+      - name: hub-config
+        secret:
+          secretName: {{ .KubeConfigSecret }}
