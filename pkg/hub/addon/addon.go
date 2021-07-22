@@ -72,9 +72,10 @@ type clusternetAddOnAgent struct {
 }
 
 // NewClusternetAddOn returns an instance of clusternetAddOnAgent
-func NewClusternetAddOnAgent(recorder events.Recorder) *clusternetAddOnAgent {
+func NewClusternetAddOnAgent(kubeClient kubernetes.Interface, recorder events.Recorder) *clusternetAddOnAgent {
 	return &clusternetAddOnAgent{
-		recorder: recorder,
+		kubeClient: kubeClient,
+		recorder:   recorder,
 	}
 }
 

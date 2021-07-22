@@ -3,6 +3,7 @@ package spoke
 import (
 	"context"
 	"errors"
+	"io/ioutil"
 
 	"github.com/clusternet/clusternet/pkg/controllers/proxies/sockets"
 
@@ -15,6 +16,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+)
+
+const (
+	addOnName                    = "clusternet"
+	defaultInstallationNamespace = "open-cluster-management-agent-addon"
 )
 
 type AgentOptions struct {
@@ -33,6 +39,15 @@ func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 	flags.StringVar(&o.ClusterName, "cluster-name", o.ClusterName, "Name of managed cluster.")
 }
 
+func (o *AgentOptions) Complete() {
+	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		o.InstallationNamespace = defaultInstallationNamespace
+		return
+	}
+	o.InstallationNamespace = string(nsBytes)
+}
+
 func (o *AgentOptions) Validate() error {
 	if o.HubKubeconfigFile == "" {
 		return errors.New("hub-kubeconfig is required")
@@ -46,6 +61,8 @@ func (o *AgentOptions) Validate() error {
 }
 
 func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	o.Complete()
+
 	if err := o.Validate(); err != nil {
 		return err
 	}
@@ -72,7 +89,7 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 
 	leaseUpdater := lease.NewLeaseUpdater(
 		spokeKubeClient,
-		"clusternet",
+		addOnName,
 		o.InstallationNamespace,
 	)
 	go leaseUpdater.Start(ctx)

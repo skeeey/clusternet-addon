@@ -3,6 +3,8 @@
 // pkg/hub/addon/manifests/clusterrole.yaml
 // pkg/hub/addon/manifests/clusterrolebinding.yaml
 // pkg/hub/addon/manifests/deployment.yaml
+// pkg/hub/addon/manifests/hub_clusterrole.yaml
+// pkg/hub/addon/manifests/hub_clusterrolebinding.yaml
 // pkg/hub/addon/manifests/namespace.yaml
 // pkg/hub/addon/manifests/role.yaml
 // pkg/hub/addon/manifests/rolebinding.yaml
@@ -161,6 +163,62 @@ func pkgHubAddonManifestsDeploymentYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "pkg/hub/addon/manifests/deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _pkgHubAddonManifestsHub_clusterroleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:clusternet-addon:{{ .ClusterName }}
+rules:
+# Allow clusternet-addon agent to access the websokets server on the hub
+- apiGroups: ["proxies.clusternet.io"]
+  resources: ["sockets"]
+  resourceNames: ["{{ .ClusterName }}"]
+  verbs: ["*"]
+`)
+
+func pkgHubAddonManifestsHub_clusterroleYamlBytes() ([]byte, error) {
+	return _pkgHubAddonManifestsHub_clusterroleYaml, nil
+}
+
+func pkgHubAddonManifestsHub_clusterroleYaml() (*asset, error) {
+	bytes, err := pkgHubAddonManifestsHub_clusterroleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "pkg/hub/addon/manifests/hub_clusterrole.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _pkgHubAddonManifestsHub_clusterrolebindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: open-cluster-management:clusternet-addon:{{ .ClusterName }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: open-cluster-management:clusternet-addon:{{ .ClusterName }}
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: {{ .Group }}
+`)
+
+func pkgHubAddonManifestsHub_clusterrolebindingYamlBytes() ([]byte, error) {
+	return _pkgHubAddonManifestsHub_clusterrolebindingYaml, nil
+}
+
+func pkgHubAddonManifestsHub_clusterrolebindingYaml() (*asset, error) {
+	bytes, err := pkgHubAddonManifestsHub_clusterrolebindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "pkg/hub/addon/manifests/hub_clusterrolebinding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -329,13 +387,15 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"pkg/hub/addon/manifests/clusterrole.yaml":        pkgHubAddonManifestsClusterroleYaml,
-	"pkg/hub/addon/manifests/clusterrolebinding.yaml": pkgHubAddonManifestsClusterrolebindingYaml,
-	"pkg/hub/addon/manifests/deployment.yaml":         pkgHubAddonManifestsDeploymentYaml,
-	"pkg/hub/addon/manifests/namespace.yaml":          pkgHubAddonManifestsNamespaceYaml,
-	"pkg/hub/addon/manifests/role.yaml":               pkgHubAddonManifestsRoleYaml,
-	"pkg/hub/addon/manifests/rolebinding.yaml":        pkgHubAddonManifestsRolebindingYaml,
-	"pkg/hub/addon/manifests/serviceaccount.yaml":     pkgHubAddonManifestsServiceaccountYaml,
+	"pkg/hub/addon/manifests/clusterrole.yaml":            pkgHubAddonManifestsClusterroleYaml,
+	"pkg/hub/addon/manifests/clusterrolebinding.yaml":     pkgHubAddonManifestsClusterrolebindingYaml,
+	"pkg/hub/addon/manifests/deployment.yaml":             pkgHubAddonManifestsDeploymentYaml,
+	"pkg/hub/addon/manifests/hub_clusterrole.yaml":        pkgHubAddonManifestsHub_clusterroleYaml,
+	"pkg/hub/addon/manifests/hub_clusterrolebinding.yaml": pkgHubAddonManifestsHub_clusterrolebindingYaml,
+	"pkg/hub/addon/manifests/namespace.yaml":              pkgHubAddonManifestsNamespaceYaml,
+	"pkg/hub/addon/manifests/role.yaml":                   pkgHubAddonManifestsRoleYaml,
+	"pkg/hub/addon/manifests/rolebinding.yaml":            pkgHubAddonManifestsRolebindingYaml,
+	"pkg/hub/addon/manifests/serviceaccount.yaml":         pkgHubAddonManifestsServiceaccountYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -383,13 +443,15 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"hub": {nil, map[string]*bintree{
 			"addon": {nil, map[string]*bintree{
 				"manifests": {nil, map[string]*bintree{
-					"clusterrole.yaml":        {pkgHubAddonManifestsClusterroleYaml, map[string]*bintree{}},
-					"clusterrolebinding.yaml": {pkgHubAddonManifestsClusterrolebindingYaml, map[string]*bintree{}},
-					"deployment.yaml":         {pkgHubAddonManifestsDeploymentYaml, map[string]*bintree{}},
-					"namespace.yaml":          {pkgHubAddonManifestsNamespaceYaml, map[string]*bintree{}},
-					"role.yaml":               {pkgHubAddonManifestsRoleYaml, map[string]*bintree{}},
-					"rolebinding.yaml":        {pkgHubAddonManifestsRolebindingYaml, map[string]*bintree{}},
-					"serviceaccount.yaml":     {pkgHubAddonManifestsServiceaccountYaml, map[string]*bintree{}},
+					"clusterrole.yaml":            {pkgHubAddonManifestsClusterroleYaml, map[string]*bintree{}},
+					"clusterrolebinding.yaml":     {pkgHubAddonManifestsClusterrolebindingYaml, map[string]*bintree{}},
+					"deployment.yaml":             {pkgHubAddonManifestsDeploymentYaml, map[string]*bintree{}},
+					"hub_clusterrole.yaml":        {pkgHubAddonManifestsHub_clusterroleYaml, map[string]*bintree{}},
+					"hub_clusterrolebinding.yaml": {pkgHubAddonManifestsHub_clusterrolebindingYaml, map[string]*bintree{}},
+					"namespace.yaml":              {pkgHubAddonManifestsNamespaceYaml, map[string]*bintree{}},
+					"role.yaml":                   {pkgHubAddonManifestsRoleYaml, map[string]*bintree{}},
+					"rolebinding.yaml":            {pkgHubAddonManifestsRolebindingYaml, map[string]*bintree{}},
+					"serviceaccount.yaml":         {pkgHubAddonManifestsServiceaccountYaml, map[string]*bintree{}},
 				}},
 			}},
 		}},
