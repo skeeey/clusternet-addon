@@ -137,7 +137,7 @@ spec:
       serviceAccountName: clusternet-addon-sa
       containers:
       - name: clusternet-addon
-        image: quay.io/skeeey/clusternet-addon:latest
+        image: {{ .Image }}
         args:
           - "/clusternet"
           - "agent"

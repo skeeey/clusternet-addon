@@ -9,13 +9,12 @@ import (
 	"github.com/open-cluster-management/addon-framework/pkg/agent"
 	addonapiv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
 	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-
-	"github.com/skeeey/clusternet-addon/pkg/hub/addon/bindata"
-
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	"github.com/skeeey/clusternet-addon/pkg/helpers"
+	"github.com/skeeey/clusternet-addon/pkg/hub/addon/bindata"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,11 +35,7 @@ func init() {
 	scheme.AddToScheme(genericScheme)
 }
 
-const (
-	addOnName                    = "clusternet"
-	agentName                    = "clusternet-addon-agent"
-	defaultInstallationNamespace = "open-cluster-management-agent-addon"
-)
+const agentName = "clusternet-addon-agent"
 
 const (
 	addOnGroup         = "system:open-cluster-management:addon:clusternet"
@@ -69,13 +64,15 @@ var agentHubPermissionFiles = []string{
 type clusternetAddOnAgent struct {
 	kubeClient kubernetes.Interface
 	recorder   events.Recorder
+	agentImage string
 }
 
 // NewClusternetAddOn returns an instance of clusternetAddOnAgent
-func NewClusternetAddOnAgent(kubeClient kubernetes.Interface, recorder events.Recorder) *clusternetAddOnAgent {
+func NewClusternetAddOnAgent(kubeClient kubernetes.Interface, recorder events.Recorder, agentImage string) *clusternetAddOnAgent {
 	return &clusternetAddOnAgent{
 		kubeClient: kubeClient,
 		recorder:   recorder,
+		agentImage: agentImage,
 	}
 }
 
@@ -87,13 +84,13 @@ func (a *clusternetAddOnAgent) Manifests(cluster *clusterv1.ManagedCluster, addo
 	// using open-cluster-management-agent-addon namespace as default namespace.
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
-		installNamespace = defaultInstallationNamespace
+		installNamespace = helpers.DefaultInstallationNamespace
 	}
 
 	deploymentFiles := append([]string{}, agentDeploymentFiles...)
 	// if the installation namesapce is default namespace (open-cluster-management-agent-addon),
 	// we will not maintain (create/delete) it, because other ACM addons will be installed this namespace.
-	if installNamespace != defaultInstallationNamespace {
+	if installNamespace != helpers.DefaultInstallationNamespace {
 		deploymentFiles = append(deploymentFiles, agentInstallationNamespaceFile)
 	}
 
@@ -106,6 +103,7 @@ func (a *clusternetAddOnAgent) Manifests(cluster *clusterv1.ManagedCluster, addo
 		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", a.GetAgentAddonOptions().AddonName),
 		AddonInstallNamespace: installNamespace,
 		ClusterName:           cluster.Name,
+		Image:                 a.agentImage,
 	}
 
 	for _, file := range deploymentFiles {
@@ -122,9 +120,9 @@ func (a *clusternetAddOnAgent) Manifests(cluster *clusterv1.ManagedCluster, addo
 // GetAgentAddonOptions returns the options of clusternet-addon agent
 func (a *clusternetAddOnAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
-		AddonName: addOnName,
+		AddonName: helpers.AddOnName,
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: agent.KubeClientSignerConfigurations(addOnName, agentName),
+			CSRConfigurations: agent.KubeClientSignerConfigurations(helpers.AddOnName, agentName),
 			CSRApproveCheck:   a.csrApproveCheck,
 			PermissionConfig:  a.permissionConfig,
 		},

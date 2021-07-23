@@ -3,24 +3,16 @@ package spoke
 import (
 	"context"
 	"errors"
-	"io/ioutil"
 
 	"github.com/clusternet/clusternet/pkg/controllers/proxies/sockets"
-
 	"github.com/open-cluster-management/addon-framework/pkg/lease"
-
-	"github.com/spf13/cobra"
-
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/skeeey/clusternet-addon/pkg/helpers"
+	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-)
-
-const (
-	addOnName                    = "clusternet"
-	defaultInstallationNamespace = "open-cluster-management-agent-addon"
 )
 
 type AgentOptions struct {
@@ -40,12 +32,7 @@ func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *AgentOptions) Complete() {
-	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		o.InstallationNamespace = defaultInstallationNamespace
-		return
-	}
-	o.InstallationNamespace = string(nsBytes)
+	o.InstallationNamespace = helpers.GetCurrentNamespace(helpers.DefaultInstallationNamespace)
 }
 
 func (o *AgentOptions) Validate() error {
@@ -89,7 +76,7 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 
 	leaseUpdater := lease.NewLeaseUpdater(
 		spokeKubeClient,
-		addOnName,
+		helpers.AddOnName,
 		o.InstallationNamespace,
 	)
 	go leaseUpdater.Start(ctx)

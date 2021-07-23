@@ -27,14 +27,14 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	command := newSubmarinerControllerCommand()
+	command := newControllerCommand()
 	if err := command.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-func newSubmarinerControllerCommand() *cobra.Command {
+func newControllerCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clusternet",
 		Short: "clusternet",
