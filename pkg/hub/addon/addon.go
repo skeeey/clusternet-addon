@@ -1,97 +1,47 @@
 package addon
 
 import (
-	"crypto/x509"
-	"encoding/pem"
+	"context"
+	"embed"
 	"fmt"
-	"path/filepath"
+	"os"
 
-	"github.com/open-cluster-management/addon-framework/pkg/agent"
-	addonapiv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
-	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
-	"github.com/openshift/library-go/pkg/assets"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	"github.com/skeeey/clusternet-addon/pkg/helpers"
-	"github.com/skeeey/clusternet-addon/pkg/hub/addon/bindata"
-
-	certificatesv1 "k8s.io/api/certificates/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/sets"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
+	"k8s.io/client-go/rest"
+
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
-var (
-	genericScheme = runtime.NewScheme()
-	genericCodecs = serializer.NewCodecFactory(genericScheme)
-	genericCodec  = genericCodecs.UniversalDeserializer()
-)
+const defaultImage = ""
 
-func init() {
-	scheme.AddToScheme(genericScheme)
-}
+//go:embed manifests
+var FS embed.FS
 
-const agentName = "clusternet-addon-agent"
-
-const (
-	addOnGroup         = "system:open-cluster-management:addon:clusternet"
-	agentUserName      = "system:open-cluster-management:cluster:%s:addon:clusternet:agent:clusternet-addon-agent"
-	clusterAddOnGroup  = "system:open-cluster-management:cluster:%s:addon:clusternet"
-	authenticatedGroup = "system:authenticated"
-)
-
-const agentInstallationNamespaceFile = "pkg/hub/addon/manifests/namespace.yaml"
-
-var agentDeploymentFiles = []string{
-	"pkg/hub/addon/manifests/clusterrole.yaml",
-	"pkg/hub/addon/manifests/clusterrolebinding.yaml",
-	"pkg/hub/addon/manifests/deployment.yaml",
-	"pkg/hub/addon/manifests/role.yaml",
-	"pkg/hub/addon/manifests/rolebinding.yaml",
-	"pkg/hub/addon/manifests/serviceaccount.yaml",
-}
-
-var agentHubPermissionFiles = []string{
-	"pkg/hub/addon/manifests/hub_clusterrole.yaml",
-	"pkg/hub/addon/manifests/hub_clusterrolebinding.yaml",
-}
-
-// clusternetAddOnAgent establishes websocket connection from the managed cluster to the hub cluster by clusterne
-type clusternetAddOnAgent struct {
-	kubeClient kubernetes.Interface
-	recorder   events.Recorder
-	agentImage string
-}
-
-// NewClusternetAddOn returns an instance of clusternetAddOnAgent
-func NewClusternetAddOnAgent(kubeClient kubernetes.Interface, recorder events.Recorder, agentImage string) *clusternetAddOnAgent {
-	return &clusternetAddOnAgent{
-		kubeClient: kubeClient,
-		recorder:   recorder,
-		agentImage: agentImage,
+func NewRegistrationOption(kubeConfig *rest.Config, addonName, agentName string) *agent.RegistrationOption {
+	return &agent.RegistrationOption{
+		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, agentName),
+		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
+		PermissionConfig:  addonRBAC(kubeConfig),
+		Namespace:         helpers.DefaultInstallationNamespace,
 	}
 }
 
-// Manifests generates manifestworks to deploy the clusternet-addon agent on the managed cluster
-func (a *clusternetAddOnAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
-	objects := []runtime.Object{}
-
-	// if the installation namespace is not set, to keep consistent with addon-framework,
-	// using open-cluster-management-agent-addon namespace as default namespace.
+func GetDefaultValues(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	installNamespace := addon.Spec.InstallNamespace
 	if len(installNamespace) == 0 {
 		installNamespace = helpers.DefaultInstallationNamespace
 	}
-
-	deploymentFiles := append([]string{}, agentDeploymentFiles...)
-	// if the installation namesapce is default namespace (open-cluster-management-agent-addon),
-	// we will not maintain (create/delete) it, because other ACM addons will be installed this namespace.
-	if installNamespace != helpers.DefaultInstallationNamespace {
-		deploymentFiles = append(deploymentFiles, agentInstallationNamespaceFile)
+	image := os.Getenv("IMAGE_NAME")
+	if len(image) == 0 {
+		image = defaultImage
 	}
 
 	manifestConfig := struct {
@@ -100,100 +50,72 @@ func (a *clusternetAddOnAgent) Manifests(cluster *clusterv1.ManagedCluster, addo
 		AddonInstallNamespace string
 		Image                 string
 	}{
-		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", a.GetAgentAddonOptions().AddonName),
+		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", addon.Name),
 		AddonInstallNamespace: installNamespace,
 		ClusterName:           cluster.Name,
-		Image:                 a.agentImage,
+		Image:                 image,
 	}
 
-	for _, file := range deploymentFiles {
-		raw := assets.MustCreateAssetFromTemplate(file, bindata.MustAsset(filepath.Join("", file)), &manifestConfig).Data
-		object, _, err := genericCodec.Decode(raw, nil, nil)
+	return addonfactory.StructToValues(manifestConfig), nil
+}
+
+func addonRBAC(kubeConfig *rest.Config) agent.PermissionConfigFunc {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+		kubeclient, err := kubernetes.NewForConfig(kubeConfig)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		objects = append(objects, object)
-	}
-	return objects, nil
-}
 
-// GetAgentAddonOptions returns the options of clusternet-addon agent
-func (a *clusternetAddOnAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
-	return agent.AgentAddonOptions{
-		AddonName: helpers.AddOnName,
-		Registration: &agent.RegistrationOption{
-			CSRConfigurations: agent.KubeClientSignerConfigurations(helpers.AddOnName, agentName),
-			CSRApproveCheck:   a.csrApproveCheck,
-			PermissionConfig:  a.permissionConfig,
-		},
-	}
-}
+		groups := agent.DefaultGroups(cluster.Name, addon.Name)
 
-// To check the addon agent csr, we check
-// 1. if the signer name in csr request is valid.
-// 2. if organization field and commonName field in csr request is valid.
-// 3. if user name in csr is the same as commonName field in csr request.
-func (a *clusternetAddOnAgent) csrApproveCheck(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
-	if csr.Spec.SignerName != certificatesv1.KubeAPIServerClientSignerName {
-		return false
-	}
-
-	block, _ := pem.Decode(csr.Spec.Request)
-	if block == nil || block.Type != "CERTIFICATE REQUEST" {
-		klog.V(4).Infof("csr %q was not recognized: PEM block type is not CERTIFICATE REQUEST", csr.Name)
-		return false
-	}
-
-	x509cr, err := x509.ParseCertificateRequest(block.Bytes)
-	if err != nil {
-		klog.V(4).Infof("csr %q was not recognized: %v", csr.Name, err)
-		return false
-	}
-
-	requestingOrgs := sets.NewString(x509cr.Subject.Organization...)
-	if requestingOrgs.Len() != 3 {
-		return false
-	}
-
-	if !requestingOrgs.Has(authenticatedGroup) {
-		return false
-	}
-
-	if !requestingOrgs.Has(addOnGroup) {
-		return false
-	}
-
-	if !requestingOrgs.Has(fmt.Sprintf(clusterAddOnGroup, cluster.Name)) {
-		return false
-	}
-
-	return fmt.Sprintf(agentUserName, cluster.Name) == x509cr.Subject.CommonName
-}
-
-func (a *clusternetAddOnAgent) permissionConfig(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-	config := struct {
-		ClusterName string
-		Group       string
-	}{
-		ClusterName: cluster.Name,
-		Group:       fmt.Sprintf(clusterAddOnGroup, cluster.Name),
-	}
-
-	results := resourceapply.ApplyDirectly(
-		resourceapply.NewKubeClientHolder(a.kubeClient),
-		a.recorder,
-		func(name string) ([]byte, error) {
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), config).Data, nil
-		},
-		agentHubPermissionFiles...,
-	)
-
-	errs := []error{}
-	for _, result := range results {
-		if result.Error != nil {
-			errs = append(errs, result.Error)
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("open-cluster-management:%s:agent", addon.Name),
+				Namespace: cluster.Name,
+			},
+			Rules: []rbacv1.PolicyRule{
+				{Verbs: []string{"get", "list", "watch"}, Resources: []string{"configmaps"}, APIGroups: []string{""}},
+				{Verbs: []string{"get", "list", "watch"}, Resources: []string{"managedclusteraddons"}, APIGroups: []string{"addon.open-cluster-management.io"}},
+			},
 		}
-	}
 
-	return operatorhelpers.NewMultiLineAggregate(errs)
+		binding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("open-cluster-management:%s:agent", addon.Name),
+				Namespace: cluster.Name,
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "Role",
+				Name:     fmt.Sprintf("open-cluster-management:%s:agent", addon.Name),
+			},
+			Subjects: []rbacv1.Subject{
+				{Kind: "Group", APIGroup: "rbac.authorization.k8s.io", Name: groups[0]},
+			},
+		}
+
+		_, err = kubeclient.RbacV1().Roles(cluster.Name).Get(context.TODO(), role.Name, metav1.GetOptions{})
+		switch {
+		case errors.IsNotFound(err):
+			_, createErr := kubeclient.RbacV1().Roles(cluster.Name).Create(context.TODO(), role, metav1.CreateOptions{})
+			if createErr != nil {
+				return createErr
+			}
+		case err != nil:
+			return err
+		}
+
+		_, err = kubeclient.RbacV1().RoleBindings(cluster.Name).Get(context.TODO(), binding.Name, metav1.GetOptions{})
+		switch {
+		case errors.IsNotFound(err):
+			_, createErr := kubeclient.RbacV1().RoleBindings(cluster.Name).Create(context.TODO(), binding, metav1.CreateOptions{})
+			if createErr != nil {
+				return createErr
+			}
+		case err != nil:
+			return err
+		}
+
+		return nil
+	}
 }

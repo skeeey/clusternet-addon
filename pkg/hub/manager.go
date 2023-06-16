@@ -2,83 +2,58 @@ package hub
 
 import (
 	"context"
-	"fmt"
-	"os"
 
-	"github.com/open-cluster-management/addon-framework/pkg/addonmanager"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/skeeey/clusternet-addon/pkg/helpers"
 	"github.com/skeeey/clusternet-addon/pkg/hub/addon"
-	"github.com/spf13/cobra"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
-const (
-	containerName    = "clusternet-addon-controller"
-	defaultNamespace = "open-cluster-management"
-)
-
-type AddOnControllerOptions struct {
-	AgentImage string
-}
+type AddOnControllerOptions struct{}
 
 func NewAddOnControllerOptions() *AddOnControllerOptions {
 	return &AddOnControllerOptions{}
 }
 
-func (o *AddOnControllerOptions) AddFlags(cmd *cobra.Command) {
-	flags := cmd.Flags()
-	flags.StringVar(&o.AgentImage, "agent-image", o.AgentImage, "The image of addon agent.")
-}
-
-func (o *AddOnControllerOptions) Complete(kubeClient kubernetes.Interface) error {
-	if len(o.AgentImage) != 0 {
-		return nil
-	}
-
-	namespace := helpers.GetCurrentNamespace(defaultNamespace)
-	podName := os.Getenv("POD_NAME")
-	if len(podName) == 0 {
-		return fmt.Errorf("The pod enviroment POD_NAME is required")
-	}
-
-	pod, err := kubeClient.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	for _, container := range pod.Spec.Containers {
-		if container.Name == containerName {
-			o.AgentImage = pod.Spec.Containers[0].Image
-			return nil
-		}
-	}
-	return fmt.Errorf("The agent image cannot be found from the container %q of the pod %q", containerName, podName)
-}
-
 // RunControllerManager starts the clusternet add-on controller on hub.
 func (o *AddOnControllerOptions) RunControllerManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	kubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	kubeConfig := controllerContext.KubeConfig
+
+	mgr, err := addonmanager.New(kubeConfig)
 	if err != nil {
 		return err
 	}
 
-	if err := o.Complete(kubeClient); err != nil {
-		return err
-	}
+	registrationOption := addon.NewRegistrationOption(
+		kubeConfig,
+		helpers.AddOnName,
+		utilrand.String(5),
+	)
 
-	mgr, err := addonmanager.New(controllerContext.KubeConfig)
+	agentAddon, err := addonfactory.NewAgentAddonFactory(helpers.AddOnName, addon.FS, "manifests").
+		WithConfigGVRs(addonfactory.AddOnDeploymentConfigGVR).
+		WithGetValuesFuncs(addon.GetDefaultValues).
+		WithAgentRegistrationOption(registrationOption).
+		WithInstallStrategy(agent.InstallAllStrategy(helpers.DefaultInstallationNamespace)).
+		BuildTemplateAgentAddon()
 	if err != nil {
-		return err
+		klog.Fatalf("failed to build agent %v", err)
 	}
 
-	err = mgr.AddAgent(addon.NewClusternetAddOnAgent(kubeClient, controllerContext.EventRecorder, o.AgentImage))
-	if err != nil {
-		return err
+	if err = mgr.AddAgent(agentAddon); err != nil {
+		klog.Fatalf("failed to add agent", err)
 	}
 
-	go mgr.Start(ctx)
+	if err := mgr.Start(ctx); err != nil {
+		klog.Fatalf("failed to strat addon manager", err)
+	}
 
 	<-ctx.Done()
 	return nil

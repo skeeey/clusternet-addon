@@ -5,14 +5,16 @@ import (
 	"errors"
 
 	"github.com/clusternet/clusternet/pkg/controllers/proxies/sockets"
-	"github.com/open-cluster-management/addon-framework/pkg/lease"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/skeeey/clusternet-addon/pkg/helpers"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"open-cluster-management.io/addon-framework/pkg/lease"
+
+	"github.com/skeeey/clusternet-addon/pkg/helpers"
 )
 
 type AgentOptions struct {
@@ -54,12 +56,17 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 		return err
 	}
 
-	// start websocket connection
 	hubRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.HubKubeconfigFile)
 	if err != nil {
 		return err
 	}
 
+	spokeKubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	// start websocket connection
 	socketConn, err := sockets.NewController(hubRestConfig, true)
 	if err != nil {
 		return err
@@ -69,11 +76,6 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 	go socketConn.Run(ctx, &clusterID)
 
 	// start lease updater
-	spokeKubeClient, err := kubernetes.NewForConfig(controllerContext.KubeConfig)
-	if err != nil {
-		return err
-	}
-
 	leaseUpdater := lease.NewLeaseUpdater(
 		spokeKubeClient,
 		helpers.AddOnName,

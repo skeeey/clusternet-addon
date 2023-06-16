@@ -17,6 +17,5 @@ func NewController() *cobra.Command {
 	cmd.Use = "controller"
 	cmd.Short = "Start the clsuternet add-on controller"
 
-	addOnControllerOptions.AddFlags(cmd)
 	return cmd
 }
