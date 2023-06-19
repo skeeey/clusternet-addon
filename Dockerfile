@@ -1,9 +1,15 @@
-FROM registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux AS builder
+FROM golang:1.20 AS builder
+ARG OS=linux
+ARG ARCH=amd64
 WORKDIR /go/src/github.com/skeeey/clusternet-addon
 COPY . .
-ENV GO_PACKAGE github.com/skeeey/clusternet-addon
-RUN make build --warn-undefined-variables
+RUN GOOS=${OS} \
+    GOARCH=${ARCH} \
+    make build
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+ENV USER_UID=10001
+
 COPY --from=builder /go/src/github.com/skeeey/clusternet-addon/clusternet /
-RUN microdnf update && microdnf clean all
+
+USER ${USER_UID}

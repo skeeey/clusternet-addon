@@ -38,7 +38,6 @@ func (o *AddOnControllerOptions) RunControllerManager(ctx context.Context, contr
 	)
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helpers.AddOnName, addon.FS, "manifests").
-		WithConfigGVRs(addonfactory.AddOnDeploymentConfigGVR).
 		WithGetValuesFuncs(addon.GetDefaultValues).
 		WithAgentRegistrationOption(registrationOption).
 		WithInstallStrategy(agent.InstallAllStrategy(helpers.DefaultInstallationNamespace)).

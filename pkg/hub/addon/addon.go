@@ -20,7 +20,7 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
-const defaultImage = ""
+const defaultImage = "quay.io/skeeey/clusternet-addon:0.2"
 
 //go:embed manifests
 var FS embed.FS

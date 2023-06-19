@@ -11,11 +11,15 @@ import (
 
 func NewController() *cobra.Command {
 	addOnControllerOptions := hub.NewAddOnControllerOptions()
-	cmd := controllercmd.
-		NewControllerCommandConfig("clsuternet-addon-controller", version.Get(), addOnControllerOptions.RunControllerManager).
-		NewCommand()
+	cmdConfig := controllercmd.
+		NewControllerCommandConfig("clsuternet-addon-controller", version.Get(), addOnControllerOptions.RunControllerManager)
+
+	cmd := cmdConfig.NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the clsuternet add-on controller"
+
+	flags := cmd.Flags()
+	flags.BoolVar(&cmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election for the agent.")
 
 	return cmd
 }

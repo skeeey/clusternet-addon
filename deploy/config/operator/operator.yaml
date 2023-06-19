@@ -18,11 +18,12 @@ spec:
       serviceAccountName: clusternet-addon-controller
       containers:
       - name: clusternet-addon-controller
-        image: quay.io/skeeey/clusternet-addon:latest
-        imagePullPolicy: Always
+        image: quay.io/skeeey/clusternet-addon:0.2
+        imagePullPolicy: IfNotPresent
         args:
           - "/clusternet"
           - "controller"
+          - "--disable-leader-election"
         livenessProbe:
           httpGet:
             path: /healthz
@@ -40,8 +41,3 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
-        env:
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
