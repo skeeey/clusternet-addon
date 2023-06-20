@@ -6,7 +6,7 @@ import (
 
 	"github.com/clusternet/clusternet/pkg/controllers/proxies/sockets"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -27,8 +27,7 @@ func NewAgentOptions() *AgentOptions {
 	return &AgentOptions{}
 }
 
-func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
-	flags := cmd.Flags()
+func (o *AgentOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.ClusterName, "cluster-name", o.ClusterName, "Name of managed cluster.")
 }

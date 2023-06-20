@@ -32,6 +32,7 @@ func (o *AddOnControllerOptions) RunControllerManager(ctx context.Context, contr
 	}
 
 	registrationOption := addon.NewRegistrationOption(
+		ctx,
 		kubeConfig,
 		helpers.AddOnName,
 		utilrand.String(5),

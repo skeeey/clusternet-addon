@@ -24,6 +24,7 @@ spec:
           - "agent"
           - "--hub-kubeconfig=/var/run/hub/kubeconfig"
           - "--cluster-name={{ .ClusterName }}"
+          - "--disable-leader-election"
         volumeMounts:
           - name: hub-config
             mountPath: /var/run/hub

@@ -18,7 +18,7 @@ spec:
       serviceAccountName: clusternet-addon-controller
       containers:
       - name: clusternet-addon-controller
-        image: quay.io/skeeey/clusternet-addon:0.2
+        image: quay.io/skeeey/clusternet-addon:latest
         imagePullPolicy: IfNotPresent
         args:
           - "/clusternet"

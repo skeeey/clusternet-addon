@@ -11,12 +11,15 @@ import (
 
 func NewAgent() *cobra.Command {
 	agentOptions := spoke.NewAgentOptions()
-	cmd := controllercmd.
-		NewControllerCommandConfig("clusternet-addon-agent", version.Get(), agentOptions.RunAgent).
-		NewCommand()
+	cmdConfig := controllercmd.
+		NewControllerCommandConfig("clusternet-addon-agent", version.Get(), agentOptions.RunAgent)
+
+	cmd := cmdConfig.NewCommand()
 	cmd.Use = "agent"
 	cmd.Short = "Start the clusternet add-on agent"
 
-	agentOptions.AddFlags(cmd)
+	flags := cmd.Flags()
+	agentOptions.AddFlags(flags)
+	flags.BoolVar(&cmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election for the agent.")
 	return cmd
 }

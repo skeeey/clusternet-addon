@@ -2,7 +2,7 @@ all: build
 .PHONY: all
 
 IMAGE_REGISTRY ?= quay.io/skeeey
-IMAGE_TAG ?= 0.2
+IMAGE_TAG ?= latest
 IMAGE_NAME ?= $(IMAGE_REGISTRY)/clusternet-addon:$(IMAGE_TAG)
 
 # build
@@ -11,7 +11,7 @@ vendor:
 	go mod vendor
 .PHONY: vendor
 
-build:
+build: vendor
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o clusternet cmd/clusternet/main.go
 .PHONY: build
 

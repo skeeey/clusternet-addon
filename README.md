@@ -1,3 +1,5 @@
+## How to use this addon
+
 1. Deploy clusternet-hub on the OCM hub cluster
 
 2. Deploy the clusternet-addon hub controller on the OCM hub cluster
@@ -5,20 +7,7 @@
 kubectl apply -k deploy/config/manifests
 ```
 
-3. Create a clusternet ManagedClusterAddOn in the OCM managed cluster namespace (e.g. `cluster1`) on the OCM hub cluster
-```
-cat << EOF | kubectl apply -f -
-apiVersion: addon.open-cluster-management.io/v1alpha1
-kind: ManagedClusterAddOn
-metadata:
-  name: clusternet
-  namespace: cluster1
-spec:
-  installNamespace: clusternetaddon
-EOF
-```
-
-4. Create a clusternet ManagedCluster in the OCM managed cluster namespace (e.g. `cluster1`) on the OCM hub cluster
+3. Create a clusternet ManagedCluster in the OCM managed cluster namespace (e.g. `cluster1`) on the OCM hub cluster
 ```
 cat << EOF | kubectl apply -f -
 apiVersion: clusters.clusternet.io/v1beta1
@@ -33,3 +22,6 @@ spec:
   syncMode: Dual
 EOF
 ```
+
+4. Use clusternet proxy visiting your managed clusters with RBAC, refer to [Visit ManagedCluster With RBAC](https://github.com/clusternet/clusternet/tree/v0.2.0#visit-managedcluster-with-rbac).
+Note: The direct proxy path is not supported.
